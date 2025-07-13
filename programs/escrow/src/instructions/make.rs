@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
-use crate::Escrow;
+use crate::{error::ErrorCode, Escrow};
 
 #[derive(Accounts)]
 #[instruction(escrow_id: u64)]
@@ -16,16 +16,16 @@ pub struct Make<'info> {
     #[account(
         mint::token_program = token_program,
     )]
-    pub token_a_mint: InterfaceAccount<'info, Mint>,
+    pub mint_a: InterfaceAccount<'info, Mint>,
 
     #[account(
         mint::token_program = token_program,
     )]
-    pub token_b_mint: InterfaceAccount<'info, Mint>,
+    pub mint_b: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
-        associated_token::mint = token_b_mint,
+        associated_token::mint = mint_a,
         associated_token::authority = maker,
         associated_token::token_program = token_program,
     )]
@@ -35,11 +35,11 @@ pub struct Make<'info> {
     #[account(
         init,
         payer = maker,
-        associated_token::mint = token_a_mint,
+        associated_token::mint = mint_a,
         associated_token::authority = escrow,
         associated_token::token_program = token_program,
     )]
-    pub token_a_vault: InterfaceAccount<'info, TokenAccount>,
+    pub vault: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         init,
@@ -66,16 +66,19 @@ impl<'info> Make<'info> {
         amount_a: u64,
         amount_b_wanted: u64,
     ) -> Result<()> {
+        require!(self.mint_a.key() != self.mint_b.key(), ErrorCode::SameMint);
+        require!(amount_a != 0, ErrorCode::InvalidAmount);
+        require!(amount_b_wanted != 0, ErrorCode::InvalidAmount);
         self.escrow.set_inner(Escrow {
             escrow_id,
             maker: self.maker.key(),
-            mint_a: self.token_a_mint.key(),
-            mint_b: self.token_b_mint.key(),
-            amount_a,
+            mint_a: self.mint_a.key(),
+            mint_b: self.mint_b.key(),
+            amount_a: amount_a,
             amount_b_wanted,
             bump: bumps.escrow,
         });
-        Ok(())
+        self.deposit(amount_a)
     }
 
     pub fn deposit(&self, amount_a: u64) -> Result<()> {
@@ -84,13 +87,13 @@ impl<'info> Make<'info> {
                 self.token_program.to_account_info(),
                 TransferChecked {
                     from: self.maker_token_a_account.to_account_info(),
-                    mint: self.token_a_mint.to_account_info(),
-                    to: self.token_a_vault.to_account_info(),
+                    mint: self.mint_a.to_account_info(),
+                    to: self.vault.to_account_info(),
                     authority: self.maker.to_account_info(),
                 },
             ),
             amount_a,
-            self.token_a_mint.decimals,
+            self.mint_a.decimals,
         )
     }
 }

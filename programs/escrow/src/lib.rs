@@ -1,13 +1,15 @@
 #![allow(unexpected_cfgs)]
+#![allow(deprecated)]
 use anchor_lang::prelude::*;
 
+pub mod error;
 pub mod instructions;
 pub mod state;
 
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("Eh9LgkBpxCFQ4yKr15FUwuL2U4QJzVUxGYNPUzT1vj3n");
+declare_id!("2HwNM48uAovyYCHMMvELDDdBBJA5DBEiBcim3PdLX4At");
 
 #[program]
 pub mod escrow {
@@ -20,12 +22,15 @@ pub mod escrow {
         amount_b_wanted: u64,
     ) -> Result<()> {
         ctx.accounts
-            .make(&ctx.bumps, escrow_id, amount_a, amount_b_wanted)?;
-        ctx.accounts.deposit(amount_a)
+            .make(&ctx.bumps, escrow_id, amount_a, amount_b_wanted)
     }
-    pub fn take(ctx: Context<Take>, escrow_id: u64) -> Result<()> {
-        ctx.accounts
-            .make(&ctx.bumps, escrow_id, amount_a, amount_b_wanted)?;
-        ctx.accounts.deposit(amount_a)
-    }
+
+    // pub fn refund(ctx: Context<Refund>) -> Result<()> {
+    //     Ok(())
+    // }
+    // pub fn take(ctx: Context<Take>, escrow_id: u64) -> Result<()> {
+    //     ctx.accounts
+    //         .taek(&ctx.bumps, escrow_id, amount_a, amount_b_wanted)?;
+    //     ctx.accounts.deposit(amount_a)
+    // }
 }

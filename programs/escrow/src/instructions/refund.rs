@@ -8,11 +8,9 @@ use crate::Escrow;
 
 #[derive(Accounts)]
 #[instruction(escrow_id: u64)]
-pub struct Take<'info> {
+pub struct Refund<'info> {
     #[account(mut)]
-    pub taker: Signer<'info>,
-
-    pub maker: SystemAccount<'info>,
+    pub maker: Signer<'info>,
 
     #[account(
         mint::token_program = token_program,
@@ -25,35 +23,17 @@ pub struct Take<'info> {
     pub mint_b: InterfaceAccount<'info, Mint>,
 
     #[account(
-        init_if_needed,
-        payer = taker,
-        associated_token::mint = mint_b,
+        associated_token::mint = mint_a,
         associated_token::authority = maker,
         associated_token::token_program = token_program,
     )]
-    pub maker_token_b_account: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        associated_token::mint = mint_b,
-        associated_token::authority = taker,
-        associated_token::token_program = token_program,
-    )]
-    pub taker_token_b_account: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        init_if_needed,
-        payer = taker,
-        associated_token::mint = mint_a,
-        associated_token::authority = taker,
-        associated_token::token_program = token_program,
-    )]
-    pub taker_token_a_account: InterfaceAccount<'info, TokenAccount>,
+    pub maker_token_a_account: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
         seeds = [b"escrow", maker.key().as_ref(), escrow_id.to_le_bytes().as_ref()],
-        bump
+        bump,
+        close = maker
     )]
     pub escrow: Account<'info, Escrow>,
 
@@ -69,23 +49,15 @@ pub struct Take<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> Take<'info> {
-    fn take(&self) -> Result<()> {
-        // transfer tokens from taker to maker
-        transfer_checked(
-            CpiContext::new(
-                self.token_program.to_account_info(),
-                TransferChecked {
-                    authority: self.taker.to_account_info(),
-                    from: self.taker_token_b_account.to_account_info(),
-                    mint: self.mint_b.to_account_info(),
-                    to: self.maker_token_b_account.to_account_info(),
-                },
-            ),
-            self.escrow.amount_b_wanted,
-            self.mint_b.decimals,
-        )?;
-
+impl<'info> Refund<'info> {
+    fn refund(&self) -> Result<()> {
+        let seeds = &[
+            b"escrow",
+            self.maker.to_account_info().key.as_ref(),
+            &self.escrow.escrow_id.to_le_bytes()[..],
+            &[self.escrow.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
         transfer_checked(
             CpiContext::new_with_signer(
                 self.token_program.to_account_info(),
@@ -93,9 +65,9 @@ impl<'info> Take<'info> {
                     authority: self.escrow.to_account_info(),
                     from: self.vault.to_account_info(),
                     mint: self.mint_a.to_account_info(),
-                    to: self.taker_token_a_account.to_account_info(),
+                    to: self.maker_token_a_account.to_account_info(),
                 },
-                &[&[&[]]],
+                signer_seeds,
             ),
             self.escrow.amount_a,
             self.mint_a.decimals,
