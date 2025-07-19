@@ -50,7 +50,7 @@ pub struct Refund<'info> {
 }
 
 impl<'info> Refund<'info> {
-    fn refund(&self) -> Result<()> {
+    pub fn refund(&self) -> Result<()> {
         let seeds = &[
             b"escrow",
             self.maker.to_account_info().key.as_ref(),

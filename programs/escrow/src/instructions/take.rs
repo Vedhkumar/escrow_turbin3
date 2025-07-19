@@ -70,7 +70,7 @@ pub struct Take<'info> {
 }
 
 impl<'info> Take<'info> {
-    fn take(&self) -> Result<()> {
+    pub fn take(&self) -> Result<()> {
         // transfer tokens from taker to maker
         transfer_checked(
             CpiContext::new(

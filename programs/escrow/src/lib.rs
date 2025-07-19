@@ -25,12 +25,10 @@ pub mod escrow {
             .make(&ctx.bumps, escrow_id, amount_a, amount_b_wanted)
     }
 
-    // pub fn refund(ctx: Context<Refund>) -> Result<()> {
-    //     Ok(())
-    // }
-    // pub fn take(ctx: Context<Take>, escrow_id: u64) -> Result<()> {
-    //     ctx.accounts
-    //         .taek(&ctx.bumps, escrow_id, amount_a, amount_b_wanted)?;
-    //     ctx.accounts.deposit(amount_a)
-    // }
+    pub fn refund(ctx: Context<Refund>) -> Result<()> {
+        ctx.accounts.refund()
+    }
+    pub fn take(ctx: Context<Take>, _escrow_id: u64) -> Result<()> {
+        ctx.accounts.take()
+    }
 }

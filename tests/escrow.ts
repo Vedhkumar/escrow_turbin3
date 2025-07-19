@@ -127,16 +127,77 @@ describe("test", () => {
     }
 
     const escrow_account = await program.account.escrow.fetch(escrow);
-    console.log(escrow_account);
 
-    assert(escrow_account.amountA == amountA, "Invalid amountA");
+    assert(escrow_account.amountA.eq(amountA), "Invalid amountA");
     assert(
-      escrow_account.amountBWanted == amountBWanted,
+      escrow_account.amountBWanted.eq(amountBWanted),
       "Invalid amountBWanted"
     );
-    assert(escrow_account.escrowId == escrow_id, "Invalid escrowId");
-    assert(escrow_account.maker == maker.publicKey, "Invalid maker");
-    assert(escrow_account.mintA == mintA, "Invalid mintA");
-    assert(escrow_account.mintB == mintB, "Invalid mintB");
+    assert(escrow_account.escrowId.eq(escrow_id), "Invalid escrowId");
+    assert(escrow_account.maker.equals(maker.publicKey), "Invalid maker");
+    assert(escrow_account.mintA.equals(mintA), "Invalid mintA");
+    assert(escrow_account.mintB.equals(mintB), "Invalid mintB");
+  });
+
+  it("Initialize take", async () => {
+    const taker = anchor.web3.Keypair.generate();
+    // Airdrop SOL to the taker account
+    await provider.connection.confirmTransaction(
+      await provider.connection.requestAirdrop(
+        taker.publicKey,
+        anchor.web3.LAMPORTS_PER_SOL * 10
+      )
+    );
+
+    const mintBATA = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      taker,
+      mintB,
+      taker.publicKey
+    );
+    await mintTo(
+      provider.connection,
+      mintBAuthority,
+      mintB,
+      mintBATA.address,
+      mintBAuthority,
+      100 * 10 ** mintBDecimals
+    );
+
+    try {
+      await program.methods
+        .take(escrow_id)
+        .accountsPartial({
+          taker: taker.publicKey,
+          maker: maker.publicKey,
+          mintA: mintA,
+          mintB: mintB,
+          makerTokenBAccount: makerAATA.address,
+          takerTokenBAccount: mintBATA.address,
+          escrow: escrow,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([taker])
+        .rpc();
+    } catch (error) {
+      console.log("ERROR");
+      console.log(await error.getLogs());
+    }
+
+    const escrow_account = await program.account.escrow.fetch(escrow);
+    assert(escrow_account.amountA.eq(new anchor.BN(0)), "Invalid amountA");
+    assert(
+      escrow_account.amountBWanted.eq(new anchor.BN(0)),
+      "Invalid amountBWanted"
+    );
+    assert(escrow_account.escrowId.eq(escrow_id), "Invalid escrowId");
+    assert(escrow_account.maker.equals(maker.publicKey), "Invalid maker");
+    assert(escrow_account.mintA.equals(mintA), "Invalid mintA");
+    assert(escrow_account.mintB.equals(mintB), "Invalid mintB");
+
+    const makerAATABalanceAfter =
+      await provider.connection.getTokenAccountBalance(makerAATA.address);
   });
 });
